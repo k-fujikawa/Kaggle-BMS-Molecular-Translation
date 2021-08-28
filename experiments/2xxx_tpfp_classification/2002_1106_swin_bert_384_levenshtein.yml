@@ -1,0 +1,116 @@
+based_on:
+  - /work/experiments/2xxx_tpfp_classification/2000_tpfp-classification-base.yml
+
+batch_size: 32
+amp: True
+max_grad_norm: 1
+lr: 1e-5
+accum: 1
+epoch: 10
+in_chans: 1
+image_size_h: 384
+image_size_w: 384
+ratio: 0.2
+
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-tpfp-v1
+
+image_transforms_train:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: SaltAndPepperNoise
+      p: 0.5
+    - class: Denoise
+      kernel_size: 5
+      p: 0.5
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: Flip
+      p: 0.5
+    - class: ToTensorV2
+
+image_transforms_infer:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: Denoise
+      kernel_size: 5
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: ToTensorV2
+
+model_params:
+  class: TPFPClassificationModel
+  pretrained_model: /work/output/1106_swin_bert_384/fold=0/best.pth
+  tokenizer: ${tokenizer_params}
+  out_tasks:
+    # - is_GT
+    - levenshtein
+  encoder:
+    class: PretrainedSwinTransformer
+    model_name: swin_base_patch4_window12_384_in22k
+    num_classes: 0
+    in_chans: ${in_chans}
+    img_size: ${image_size_h}
+  decoder:
+    class: AutoTransformerDecoder
+    model_name: bert
+    is_decoder: True
+    num_hidden_layers: 3
+    add_cross_attention: True
+    use_cache: False
+stages:
+  data_params:
+    batch_size: 1
+    shuffle:
+    drop_last:
+    batch_sampler_params:
+      class: BMSBalanceClassSampler
+      class_name: exact_match
+      batch_size: ${batch_size}
+      ratio: ${ratio}
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 10
+    eta_min: 1e-6
+  callbacks_params:
+    loss:
+      class: MetricAggregationCallback
+      prefix: loss
+      mode: weighted_sum
+      metrics:
+        levenshtein_bce: 1
+    # gt_classification:
+    #   class: NNCompBatchMetricCallback
+    #   prefix: gt_classification
+    #   metric:
+    #     class: BCEWithLogitsLossEx
+    #   input_key: is_GT
+    #   output_key: y_is_GT
+    levenshtein_bce:
+      class: NNCompBatchMetricCallback
+      prefix: levenshtein_bce
+      metric:
+        class: BCEWithLogitsLossEx
+      input_key: levenshtein_rate
+      output_key: y_levenshtein
+    gt_auc:
+      class: NNCompLoaderMetricCallback
+      prefix: gt_auc
+      metric:
+        class: ROCAUC
+      input_key: is_GT
+      output_key: y_levenshtein
+    # image_captioning:
+    #   class: NNCompBatchMetricCallback
+    #   prefix: image_captioning
+    #   metric:
+    #     class: CrossEntropyLoss2D
+    #     ignore_index: 0
+    #   input_key:
+    #     next_token_ids: target
+    #     is_GT: mask
+    #   output_key:
+    #     logits: input

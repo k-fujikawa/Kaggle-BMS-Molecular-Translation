@@ -1,0 +1,8 @@
+based_on:
+  - /work/experiments/9xxx_inference/9000_infer-base.yml
+
+models:
+  fold=0:
+    /work/output/1003_effnet_b5/fold=0: 1
+  test:
+    /work/output/1003_effnet_b5/fold=0: 1

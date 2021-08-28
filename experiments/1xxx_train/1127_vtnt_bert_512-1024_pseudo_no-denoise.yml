@@ -1,0 +1,85 @@
+batch_size: 32
+amp: True
+max_grad_norm: 4
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-with-pseudo-lb074
+lr: 1e-5
+epochs: 15
+in_chans: 1
+image_size_h: 512
+image_size_w: 1024
+accum: 4
+
+image_transforms_train:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: SaltAndPepperNoise
+      p: 0.5
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: Flip
+      p: 0.5
+    - class: ToTensorV2
+
+image_transforms_infer:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: ToTensorV2
+
+based_on:
+  - /work/experiments/1xxx_train/1100_image-captioning-with-padding-base.yml
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: PretrainedVariableTNT
+    model_name: tnt_s_patch16_224
+    num_classes: 0
+    in_chans: ${in_chans}
+    positional_encoding_type: trainable
+    img_size_h: ${image_size_h}
+    img_size_w: ${image_size_w}
+    min_object_value: 1
+  decoder:
+    class: AutoTransformerDecoder
+    model_name: bert
+    is_decoder: True
+    num_hidden_layers: 3
+    add_cross_attention: True
+    use_cache: False
+stages:
+  data_params:
+    loaders_params:
+      train:
+        batch_size: 1
+        shuffle:
+        drop_last:
+        batch_sampler_params:
+          class: BMSBalanceClassSampler
+          samples_per_epoch: 600_000
+          class_name: is_pseudo
+          samples_per_batch:
+            "True": 8
+            "False": 24
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: ${epochs}
+    eta_min: 0
+  callbacks_params:
+    resume:
+      class: ResumeTrainingCallback
+      checkpoint_dir: /work/output/1109_vtnt_bert_512-1024-denoise-5
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLoss2D
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits

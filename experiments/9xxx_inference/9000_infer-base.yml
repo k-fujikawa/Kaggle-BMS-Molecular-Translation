@@ -1,0 +1,37 @@
+name: ???  # ファイル名が入ります
+based_on: []
+
+suffix: ""
+outdir: ${env:OUTPUTDIR}/${name}${suffix}
+dataset: valid
+stage: fold=0
+num_beams: 1
+batch_size: 64
+debug: False
+shuffle: False
+device:
+
+models: ???
+
+tokenizer_params:
+  class: HFTokenizer
+  config: ${env:INPUTDIR}/kfujikawa/bms-tokenizers-v1/inchi-atoms-numbers.json
+  out_columns:
+    - token_ids
+    - next_token_ids
+    - attention_mask
+
+collate:
+  class: CollateFunctionWrapper
+  collate_functions:
+    image:
+      class: LazyCollateFunction
+    token_ids:
+      class: SequenceCollateFunction
+      pad_value: 0
+    next_token_ids:
+      class: SequenceCollateFunction
+      pad_value: 0
+    attention_mask:
+      class: SequenceCollateFunction
+      pad_value: 0

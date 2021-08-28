@@ -1,0 +1,41 @@
+batch_size: 64
+amp: True
+max_grad_norm: 4
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-v2
+lr: 1e-4
+
+based_on:
+  - /work/experiments/1xxx_train/1000_image-captioning-base.yml
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: TimmModel
+    model_name: resnet34
+    pretrained: True
+    num_classes: 0
+  decoder:
+    class: AutoTransformerDecoder
+    model_name: bert
+    is_decoder: True
+    num_hidden_layers: 3
+    add_cross_attention: True
+    add_encoder_adaptor: False
+    num_attention_heads: 8
+    hidden_size: 512
+    intermediate_size: 1028
+stages:
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 10
+    eta_min: 1e-6
+  callbacks_params:
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLoss2D
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits

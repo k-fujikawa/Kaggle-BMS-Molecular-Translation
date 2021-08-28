@@ -1,0 +1,9 @@
+__*
+.git/*
+.ipynb_checkpoints
+input/*
+output/*
+deploy
+wandb/*
+experiments/*
+.cache/*

@@ -1,0 +1,58 @@
+version: "2.3"
+
+x-environment: &x-environment
+  - HOME=/home/anonymous
+  - INPUTDIR=/work/input
+  - OUTPUTDIR=/work/output
+  - CACHEDIR=/work/.cache
+  - TORCH_HOME=/work/.cache/torch
+  - PYTORCH_TRANSFORMERS_CACHE=/work/.cache/torch/transformers
+  - COMPETITION_ID=bms-molecular-translation
+  - PYTHONBREAKPOINT=ipdb.set_trace
+  - KAGGLE_USERNAME=${KAGGLE_USERNAME}
+  - KAGGLE_KEY=${KAGGLE_KEY}
+  - WANDB_API_KEY=${WANDB_API_KEY}
+  - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+x-volumes: &x-volumes
+  - /mnt:/mnt
+  - $PWD:/work
+  - $HOME/.config:/home/anonymous/.config
+x-defaults: &x-defaults
+  user: $UID:$GID
+  image: bms-molecular-translation
+  network_mode: bridge
+  ipc: host
+  init: true
+  working_dir: /work
+  hostname: $HOST
+  volumes:
+    *x-volumes
+  environment:
+    *x-environment
+
+services:
+  cpu:
+    <<: *x-defaults
+    build:
+      context: .
+      dockerfile: ./docker/miniconda/Dockerfile
+      args:
+        - CUDA_VERSION=${CUDA_VERSION:-11.1.1}
+        - CUDNN_VERSION=${CUDNN_VERSION:-8}
+        - TORCH_VERSION=${TORCH_VERSION:-1.8.1+cu111}
+        - TORCHVISION_VERSION=${TORCHVISION_VERSION:-0.9.1+cu111}
+  gpu:
+    <<: *x-defaults
+    runtime: nvidia
+  jupyter: &jupyter
+    <<: *x-defaults
+    ports:
+      - "${PORT:-8888}:${PORT:-8888}"
+    command: >
+      bash -c "jupyter lab --ip 0.0.0.0 --allow-root --port ${PORT:-8888}"
+  jupyter-gpu:
+    <<: *jupyter
+    runtime: nvidia
+  devcontainer:
+    <<: *x-defaults
+    command: sleep infinity

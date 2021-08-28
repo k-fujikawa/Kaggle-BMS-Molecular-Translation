@@ -1,0 +1,6 @@
+based_on:
+  - /work/experiments/9xxx_inference/9000_infer-base.yml
+
+models:
+  /work/output/1102_vtnt_bert_224-448_denoise-5/fold=0: 1
+  /work/output/1105_vtnt_bert_448_denoise-5/fold=0: 1

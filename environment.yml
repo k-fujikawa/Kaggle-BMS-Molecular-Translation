@@ -1,0 +1,13 @@
+name: base
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - pip=21.0.1
+  - numpy
+  - scipy
+  - cython
+  - flake8
+  - pytest
+  - nodejs
+  - rdkit=2020.09.1

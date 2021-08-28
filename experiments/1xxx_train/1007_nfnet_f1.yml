@@ -1,0 +1,50 @@
+batch_size: 32
+amp: True
+max_grad_norm: 4
+epochs: 10
+image_size: 224
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-v2
+
+based_on:
+  - /work/experiments/1xxx_train/1000_image-captioning-base.yml
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: TimmModel
+    model_name: dm_nfnet_f1
+    pretrained: True
+    num_classes: 0
+  decoder:
+    class: AttnLSTMDecoderFast
+    embed_dim: 256
+    image_hidden_dim: 3072
+    token_hidden_dim: 512
+    n_layers: 3
+    n_heads: 1
+    p_dropout: 0.3
+    concat_hs: True
+    layernorm: True
+
+stages:
+  optimizer_params:
+    class: Adam
+    lr: ${lr}
+    eps: 1e-7
+    layerwise_params:
+      encoder.*:
+        lr: 1e-4
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 10
+    eta_min: 1e-7
+  callbacks_params:
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLoss2D
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits

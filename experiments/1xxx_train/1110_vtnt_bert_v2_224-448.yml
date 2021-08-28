@@ -1,0 +1,75 @@
+batch_size: 32
+amp: True
+max_grad_norm: 4
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-v2
+lr: 4e-4
+epoch: 10
+in_chans: 1
+image_size_h: 224
+image_size_w: 448
+accum: 4
+
+image_transforms_train:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: Denoise
+      kernel_size: 5
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: Flip
+      p: 0.5
+    - class: ToTensorV2
+
+image_transforms_infer:
+  class: AlbumentationCompose
+  transforms:
+    - class: Binalize
+    - class: Denoise
+      kernel_size: 5
+    - class: Resize
+      height: ${image_size_h}
+      width: ${image_size_w}
+    - class: ToTensorV2
+
+based_on:
+  - /work/experiments/1xxx_train/1100_image-captioning-with-padding-base.yml
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: PretrainedVariableTNT
+    model_name: tnt_s_patch16_224
+    num_classes: 0
+    in_chans: ${in_chans}
+    positional_encoding_type: trainable
+    img_size_h: ${image_size_h}
+    img_size_w: ${image_size_w}
+    min_object_value: 1
+  decoder:
+    class: AutoTransformerDecoderV2
+    model_name: bert
+    is_decoder: True
+    num_hidden_layers: 3
+    add_cross_attention: True
+    add_encoder_adaptor: True
+    use_cache: False
+    concat_hidden_layers:
+      - -1
+      - -2
+stages:
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 10
+    eta_min: 1e-6
+  callbacks_params:
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLoss2D
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits

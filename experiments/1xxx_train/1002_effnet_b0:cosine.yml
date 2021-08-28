@@ -1,0 +1,39 @@
+batch_size: 64
+amp: True
+max_grad_norm: 4
+
+based_on:
+  - /work/experiments/1xxx_train/1000_image-captioning-base.yml
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: TimmModel
+    model_name: efficientnet_b0
+    pretrained: True
+    num_classes: 0
+  decoder:
+    class: AttnLSTMDecoderFast
+    embed_dim: 256
+    image_hidden_dim: 1280
+    token_hidden_dim: 512
+    n_layers: 3
+    n_heads: 1
+    p_dropout: 0.3
+    concat_hs: True
+
+stages:
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 4
+    eta_min: 1e-6
+  callbacks_params:
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLossEx
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits

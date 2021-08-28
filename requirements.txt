@@ -1,0 +1,9 @@
+python-Levenshtein
+cairosvg
+reportlab
+cssutils
+lxml
+svg.path
+effdet==0.2.1
+optuna
+google-cloud-storage

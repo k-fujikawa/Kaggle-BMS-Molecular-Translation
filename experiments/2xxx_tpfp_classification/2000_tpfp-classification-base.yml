@@ -1,0 +1,129 @@
+name: ???  # ファイル名が入ります
+experiment_id: ???
+based_on: []
+
+device:
+suffix: ""
+debug: False
+bench: False
+use_wandb: False
+notify_slack: True
+competition_id: ${env:COMPETITION_ID}
+preprocessed_dir: ???
+outdir: ${env:OUTPUTDIR}/${name}${suffix}
+seed: 1
+epochs: 10
+batch_size: 32
+infer_batch_size: ${batch_size}
+lr: 1e-4
+cache_overwrite: False
+num_workers:
+length:
+accum: 1
+accumulation_steps: ${accum}
+max_grad_norm: 1
+amp: False
+image_size_h: 224
+image_size_w: 224
+use_folds: [0]
+resume_dir:
+resume:
+in_chans: 1
+distributed_params:
+  amp: ${amp}
+
+args:
+  seed: ${seed}
+  logdir: ${outdir}
+
+wandb:
+  store_artifacts: False
+  log_on_batch_end: True
+  log:
+  log_interval: 5
+  tags: ["tpfp-classification"]
+
+inputs:
+  train: ${preprocessed_dir}/train.pkl
+
+experiment_params:
+  class: KFoldSupervisedExperiment
+
+runner_params:
+  class: SupervisedRunner
+  input_key:
+  output_key:
+  
+splitter_params:
+  class: PreAssignedSplitter
+  filepath: ${env:INPUTDIR}/kfujikawa/bms-kfold/10fold.csv
+  use_folds: ${use_folds}
+  merge_keys: image_id
+
+model_params:
+  class: ???
+
+tokenizer_params:
+  class: HFTokenizer
+  config: ${env:INPUTDIR}/kfujikawa/bms-tokenizers-v1/inchi-atoms-numbers.json
+  out_columns:
+    - token_ids
+    - next_token_ids
+    - attention_mask
+
+image_transforms_train: ???
+image_transforms_infer: ???
+
+stages:
+  stage_params:
+    main_metric: loss 
+    minimize_metric: True
+    num_epochs: ${epochs}
+  data_params:
+    batch_size: ${infer_batch_size}
+    num_workers: ${num_workers}
+    dataset:
+      class: ImageCaptioningDataset
+      length: ${length}
+      inchi_transforms: ${tokenizer_params}
+      image_transforms: ${image_transforms_infer}
+      in_chans: ${in_chans}
+    collate:
+      class: CollateFunctionWrapper
+      collate_functions:
+        token_ids:
+          class: SequenceCollateFunction
+          pad_value: 0
+        next_token_ids:
+          class: SequenceCollateFunction
+          pad_value: 0
+        attention_mask:
+          class: SequenceCollateFunction
+          pad_value: 0
+    loaders_params:
+      train:
+        dataset:
+          image_transforms: ${image_transforms_train}
+  optimizer_params:
+    class: Adam
+    lr: ${lr}
+    eps: 1e-7
+  callbacks_params:
+    global_epoch:
+      class: AdjustGlobalEpochCallback
+    checkpoint:
+      class: CheckpointCallbackEx
+      save_last_state: True
+      save_n_best: 1
+      resume: ${resume}
+    optimizer:
+      class: OptimizerCallback
+      accumulation_steps: ${accumulation_steps}
+      grad_clip_params:
+        class: clip_grad_norm_
+        max_norm: ${max_grad_norm}
+    slack:
+      class: SlackLogger
+      channel: "#kfujikawa-alert"
+      experiment_id: ${experiment_id}
+      enable: ${notify_slack}

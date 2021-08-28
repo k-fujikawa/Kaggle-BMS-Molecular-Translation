@@ -1,0 +1,61 @@
+batch_size: 128
+amp: True
+max_grad_norm: 4
+epochs: 10
+image_size: 480
+preprocessed_dir: ${env:INPUTDIR}/kfujikawa/bms-preprocess-v2
+
+based_on:
+  - /work/experiments/1xxx_train/1000_image-captioning-base.yml
+
+image_transforms_train:
+  class: AlbumentationCompose
+  transforms:
+    - class: Resize
+      height: ${image_size}
+      width: ${image_size}
+    - class: Flip
+      p: 0.5
+    - class: ToTensorV2
+
+image_transforms_infer:
+  class: AlbumentationCompose
+  transforms:
+    - class: Resize
+      height: ${image_size}
+      width: ${image_size}
+    - class: ToTensorV2
+
+model_params:
+  class: ImageCaptioningModel
+  tokenizer: ${tokenizer_params}
+  encoder:
+    class: YOLOv5Encoder
+    pretrained_model: ${env:OUTPUTDIR}/8001_yolov5_0411/state_dict.pt
+    cfg: submodules/yolov5/models/yolov5x.yaml
+    nc: 17
+  decoder:
+    class: AttnLSTMDecoderFast
+    embed_dim: 256
+    image_hidden_dim: 1280
+    token_hidden_dim: 512
+    n_layers: 3
+    n_heads: 1
+    p_dropout: 0.3
+    concat_hs: True
+    layernorm: True
+
+stages:
+  scheduler_params:
+    class: CosineAnnealingLR
+    T_max: 10
+    eta_min: 1e-7
+  callbacks_params:
+    loss:
+      class: NNCompBatchMetricCallback
+      prefix: loss
+      metric:
+        class: CrossEntropyLoss2D
+        ignore_index: 0
+      input_key: next_token_ids
+      output_key: logits
